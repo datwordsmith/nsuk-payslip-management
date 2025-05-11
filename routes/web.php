@@ -31,14 +31,7 @@ Route::get('/register', function () {
 //Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::prefix('t')->middleware(['auth', 'isAdmin'])->group(function (){
-    Route::prefix('users')->group(function () {
-        Route::get('/', App\Http\Livewire\Admin\User\Index::class);
-        Route::get('/active', App\Http\Livewire\Admin\User\Active::class);
-        Route::get('/inactive', App\Http\Livewire\Admin\User\Inactive::class);
-        Route::get('/admin', App\Http\Livewire\Admin\User\Admin::class);
-    });
     Route::get('/payslips', App\Http\Livewire\Admin\FileUpload\Index::class)->name('payslips');
     Route::get('/staff', App\Http\Livewire\Admin\Staff\Index::class)->name('staff');
     Route::get('/dispatch_payslips', App\Http\Livewire\Admin\PayslipDispatch\Index::class)->name('dispatch');
-
 });
