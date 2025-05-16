@@ -51,6 +51,9 @@
                         <div class="mt-5 mb-3">
                             <input type="text" class="form-control" wire:model="search" placeholder="Search...">
                         </div>
+                        <div class="mb-2">
+                            <strong>Total files uploaded:</strong> {{ $fileUploads->total() }}
+                        </div>
                         <div class="table-responsive">
                             <table id="category_table" class="table table-striped align-items-center mb-0" style="width:100%">
                                 <thead class="table-dark">

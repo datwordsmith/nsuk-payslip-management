@@ -46,11 +46,19 @@ class PayslipNotification extends Notification
      */
     public function toMail($notifiable)
     {
+        $period = date('F Y', mktime(0, 0, 0, $this->month, 1, $this->year));
+        $subject = "Payslip for " . $period;
+
         return (new MailMessage)
-                ->subject("Payslip for " . date('F Y', mktime(0, 0, 0, $this->month, 1, $this->year)))
-                ->line('Please find attached your payslip.')
-                ->line('Thank you for using our application!')
-                ->attach(storage_path('app/' . $this->file->path));
+            ->view(
+                'emails.payslip',
+                [
+                    'subject' => $subject,
+                    'period' => $period
+                ]
+            )
+            ->subject($subject)
+            ->attach(storage_path('app/' . $this->file->path));
     }
 
     /**

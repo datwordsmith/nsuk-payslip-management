@@ -18,6 +18,7 @@ class Index extends Component
     public $staff_id;
     public $email;
     public $excelFile;
+    public $importedCount = null;
     public $search = '';
 
     protected $rules = [
@@ -49,9 +50,12 @@ class Index extends Component
         ]);
 
         try {
-            Excel::import(new StaffImport, $this->excelFile);
+            $import = new StaffImport;
+            Excel::import($import,  $this->excelFile);
 
-            session()->flash('message', 'Staff imported successfully!');
+            $this->importedCount = $import->importedCount;
+
+            session()->flash('message', "{$this->importedCount} staff records imported successfully!");
             $this->reset('excelFile');
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $failures = $e->failures();

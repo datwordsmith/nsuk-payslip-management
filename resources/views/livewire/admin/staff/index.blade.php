@@ -10,6 +10,11 @@
         @if (session('error'))
             <div class="alert alert-danger">{{ session('error') }}</div>
         @endif
+        @if($importedCount)
+            <div class="alert alert-info mt-2">
+                Total records uploaded from Excel: {{ $importedCount }}
+            </div>
+        @endif
 
         <div class="row">
             <div class="col-md-4">
@@ -61,6 +66,10 @@
                         <!-- Search -->
                         <div class="my-3">
                             <input type="text" class="form-control" wire:model="search" placeholder="Search staff...">
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Total records:</strong> {{ $staffList->total() }}
                         </div>
 
                         <!-- Staff List Table -->

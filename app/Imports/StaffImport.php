@@ -9,8 +9,10 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 
 class StaffImport implements ToModel, WithStartRow, WithValidation
 {
+    public $importedCount = 0;
     public function model(array $row)
     {
+        $this->importedCount++;
         // Skip empty rows
         if (empty($row[1]) || empty($row[2])) {
             return null;

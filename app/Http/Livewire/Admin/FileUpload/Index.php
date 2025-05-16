@@ -56,7 +56,7 @@ class Index extends Component
                 );
 
                 if ($validator->fails()) {
-                    $this->reset('files');
+                $this->reset('files');
                     session()->flash('error', $validator->errors()->first());
                     return;
                 }
@@ -92,6 +92,7 @@ class Index extends Component
 
     public function upload()
     {
+        $this->processing = true;
         foreach ($this->files as $key => $file) {
             $filename = $file->getClientOriginalName();
             if (!preg_match('/^[A-Z]{2}\d{4}_(?:0[1-9]|1[0-2])2025\.pdf$/', $filename)) {

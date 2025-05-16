@@ -45,6 +45,11 @@
                 <div class="my-3">
                     <input type="text" class="form-control" wire:model="search" placeholder="Search dispatches...">
                 </div>
+                <div>
+                    <button wire:click="exportToExcel" class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> Export to Excel
+                    </button>
+                </div>
 
                 <div class="table-responsive">
                     <table class="table table-striped">
