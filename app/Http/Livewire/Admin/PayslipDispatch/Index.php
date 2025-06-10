@@ -143,31 +143,43 @@ class Index extends Component
             return;
         }
 
-        try {
-            $staff->notify(new PayslipNotification($file, $dispatch->month, $dispatch->year));
+        ProcessPayslipDispatch::dispatch(
+            $file->id,
+            $dispatch->month,
+            $dispatch->year,
+            auth()->id()
+        );
+        session()->flash('message', 'Payslip resent queued successfully!');
+    }
 
-            PayslipDispatch::create([
-                'staff_id' => $staff->staff_id,
-                'email' => $staff->email,
-                'month' => $dispatch->month,
-                'year' => $dispatch->year,
-                'status' => 'sent',
-                'sent_at' => now(),
-                'sent_by' => auth()->id()
-            ]);
-            session()->flash('message', 'Payslip resent successfully!');
-        } catch (\Exception $e) {
-            PayslipDispatch::create([
-                'staff_id' => $staff->staff_id,
-                'email' => $staff->email,
-                'month' => $dispatch->month,
-                'year' => $dispatch->year,
-                'status' => 'failed',
-                'sent_by' => auth()->id()
-            ]);
-            \Log::error('Payslip resend failed for '.$staff->staff_id.': '.$e->getMessage());
-            session()->flash('error', 'Payslip resend failed.');
+    public function resendFailedDispatches()
+    {
+        if (!$this->month || !$this->year) {
+            session()->flash('error', 'Please select both month and year.');
+            return;
         }
+
+        $failedDispatches = PayslipDispatch::where('month', $this->month)
+            ->where('year', $this->year)
+            ->where('status', 'failed')
+            ->get();
+
+        if ($failedDispatches->isEmpty()) {
+            session()->flash('info', 'No failed dispatches found for the selected month and year.');
+            return;
+        }
+
+        foreach ($failedDispatches as $dispatch) {
+            // Dispatch the resend job for each failed dispatch
+            ProcessPayslipDispatch::dispatch(
+                $dispatch->file_id, // Assuming you have file_id in PayslipDispatch
+                $dispatch->month,
+                $dispatch->year,
+                auth()->id()
+            );
+        }
+
+        session()->flash('message', count($failedDispatches) . ' failed dispatches have been queued for resending.');
     }
 
     public function exportToExcel()

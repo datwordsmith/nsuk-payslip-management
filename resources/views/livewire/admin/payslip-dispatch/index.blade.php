@@ -9,6 +9,12 @@
         @if (session('message'))
             <div class="alert alert-success">{{ session('message') }}</div>
         @endif
+        @if (session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
+        @if (session('info'))
+            <div class="alert alert-info">{{ session('info') }}</div>
+        @endif
 
         <div class="card">
             <div class="card-body p-4">
@@ -48,6 +54,9 @@
                 <div>
                     <button wire:click="exportToExcel" class="btn btn-success">
                         <i class="fas fa-file-excel"></i> Export to Excel
+                    </button>
+                    <button wire:click="resendFailedDispatches" class="btn btn-warning">
+                        Resend Failed
                     </button>
                 </div>
 
