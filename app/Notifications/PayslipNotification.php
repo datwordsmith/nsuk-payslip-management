@@ -46,19 +46,47 @@ class PayslipNotification extends Notification
      */
     public function toMail($notifiable)
     {
+        \Log::info('PayslipNotification toMail called', [
+            'recipient' => $notifiable->email,
+            'file_path' => $this->file->path,
+            'month' => $this->month,
+            'year' => $this->year
+        ]);
+
         $period = date('F Y', mktime(0, 0, 0, $this->month, 1, $this->year));
         $subject = "Payslip for " . $period;
 
-        return (new MailMessage)
-            ->view(
-                'emails.payslip',
-                [
-                    'subject' => $subject,
-                    'period' => $period
-                ]
-            )
-            ->subject($subject)
-            ->attach(storage_path('app/' . $this->file->path));
+        $filePath = storage_path('app/' . $this->file->path);
+
+        \Log::info('File attachment details', [
+            'full_path' => $filePath,
+            'file_exists' => file_exists($filePath),
+            'file_size' => file_exists($filePath) ? filesize($filePath) : 'N/A',
+            'is_readable' => is_readable($filePath)
+        ]);
+
+        try {
+            $mailMessage = (new MailMessage)
+                ->view(
+                    'emails.payslip',
+                    [
+                        'subject' => $subject,
+                        'period' => $period
+                    ]
+                )
+                ->subject($subject)
+                ->attach($filePath);
+
+            \Log::info('Mail message created successfully');
+            return $mailMessage;
+
+        } catch (\Exception $e) {
+            \Log::error('Error creating mail message', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
 
     /**

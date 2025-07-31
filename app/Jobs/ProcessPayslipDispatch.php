@@ -21,16 +21,18 @@ class ProcessPayslipDispatch implements ShouldQueue
     protected $month;
     protected $year;
     protected $userId;
+    private $isResend;
 
     /**
      * Create a new job instance.
      */
-    public function __construct($fileId, $month, $year, $userId)
+    public function __construct($fileId, $month, $year, $userId, $isResend = false)
     {
         $this->fileId = $fileId;
         $this->month = $month;
         $this->year = $year;
         $this->userId = $userId;
+        $this->isResend = $isResend;
     }
 
     /**
@@ -50,14 +52,15 @@ class ProcessPayslipDispatch implements ShouldQueue
             return;
         }
 
-        // Double-check that it hasn't been sent during the queue wait time
+        // Only check for 'sent' status to allow resending failed ones
         $alreadyDispatched = PayslipDispatch::where('staff_id', $staff->staff_id)
             ->where('month', $this->month)
             ->where('year', $this->year)
+            ->where('status', 'sent')
             ->exists();
 
         if ($alreadyDispatched) {
-            Log::info('Payslip already dispatched while in queue', [
+            Log::info('Payslip already dispatched successfully; skipping.', [
                 'staff_id' => $staff->staff_id,
                 'month' => $this->month,
                 'year' => $this->year
@@ -66,45 +69,57 @@ class ProcessPayslipDispatch implements ShouldQueue
         }
 
         try {
+            Log::info('About to send payslip notification', [
+                'staff_id' => $staff->staff_id,
+                'email' => $staff->email,
+                'month' => $this->month,
+                'year' => $this->year
+            ]);
+
             $staff->notify(new PayslipNotification($file, $this->month, $this->year));
 
-            // Record successful dispatch
-            PayslipDispatch::create([
+            // Create or update dispatch record
+            PayslipDispatch::updateOrCreate(
+                [
+                    'staff_id' => $staff->staff_id,
+                    'month' => $this->month,
+                    'year' => $this->year,
+                ],
+                [
+                    'email' => $staff->email,
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'sent_by' => $this->userId,
+                ]
+            );
+
+            Log::info('Payslip sent successfully', [
                 'staff_id' => $staff->staff_id,
-                'email' => $staff->email,
-                'file_id' => $this->fileId, // Set the file_id here
-                'month' => $this->month,
-                'year' => $this->year,
-                'status' => 'sent',
-                'sent_at' => now(),
-                'sent_by' => $this->userId,
+                'email' => $staff->email
             ]);
 
-            Log::info('Payslip sent successfully via queue', [
-                'staff_id' => $staff->staff_id,
-                'month' => $this->month,
-                'year' => $this->year,
-            ]);
         } catch (\Exception $e) {
-            // Construct the filename
-            $filename = $staff->staff_id . '_' . str_pad($this->month, 2, '0', STR_PAD_LEFT) . $this->year . '.pdf';
-
-            // Record failed dispatch
-            PayslipDispatch::create([
+            Log::error('Failed to send payslip', [
                 'staff_id' => $staff->staff_id,
                 'email' => $staff->email,
-                'file_id' => $this->fileId, // Set the file_id here
-                'month' => $this->month,
-                'year' => $this->year,
-                'status' => 'failed',
-                'sent_by' => $this->userId,
+                'error' => $e->getMessage()
             ]);
 
-            Log::error('Payslip sending failed in queue', [
-                'staff_id' => $staff->staff_id,
-                'filename' => $filename, // Include the filename in the log
-                'error' => $e->getMessage(),
-            ]);
+            // Create or update dispatch record with failed status
+            PayslipDispatch::updateOrCreate(
+                [
+                    'staff_id' => $staff->staff_id,
+                    'month' => $this->month,
+                    'year' => $this->year,
+                ],
+                [
+                    'email' => $staff->email,
+                    'status' => 'failed',
+                    'sent_by' => $this->userId,
+                ]
+            );
+
+            throw $e;
         }
     }
 }

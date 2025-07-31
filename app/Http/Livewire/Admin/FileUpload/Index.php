@@ -20,6 +20,9 @@ class Index extends Component
 
     public $search;
 
+    public $uploadMessage = null;
+    public $uploadError = null;
+
     protected $rules = [
         'files.*' => [
             'required',
@@ -141,16 +144,19 @@ class Index extends Component
 
             // Show appropriate messages
             if ($successCount > 0) {
-                session()->flash('message', "$successCount file(s) uploaded successfully!");
+                //session()->flash('message', "$successCount file(s) uploaded successfully!");
+                $this->uploadMessage = "$successCount file(s) uploaded successfully!";
             }
             if (!empty($errors)) {
-                session()->flash('error', implode("\n", $errors));
+                //session()->flash('error', implode("\n", $errors));
+                $this->uploadError = implode("\n", $errors);
             }
 
             $this->emit('filesUploaded');
 
         } catch (\Exception $e) {
-            session()->flash('error', 'Error uploading files. Please ensure filenames are in the correct format (e.g., JS0031_042025.pdf)');
+            //session()->flash('error', 'Error uploading files. Please ensure filenames are in the correct format (e.g., JS0031_042025.pdf)');
+            $this->uploadError = 'Error uploading files. Please ensure filenames are in the correct format (e.g., JS0031_042025.pdf)';
         }
     }
 
@@ -167,17 +173,58 @@ class Index extends Component
 
     public function render()
     {
+        $search = trim($this->search);
 
-        $fileUploads = FileUpload::where(function($query) {
-            $query->where('name', 'like', '%'.$this->search.'%')
-                ->orWhere('staff_id', 'like', '%'.$this->search.'%')
-                ->orWhere('year', 'like', '%'.$this->search.'%');
+        $fileUploads = FileUpload::where(function($query) use ($search) {
+            // Match "07 2025" or "7 2025"
+            if (preg_match('/^(\d{1,2})\s+(\d{4})$/', $search, $matches)) {
+                $month = intval($matches[1]);
+                $year = intval($matches[2]);
+                $query->where('month', $month)
+                    ->where('year', $year);
+                return;
+            }
+
+            // Match "July 2025" or "jul 2025"
+            if (preg_match('/^([a-z]{3,9})\s+(\d{4})$/i', $search, $matches)) {
+                $month = date('n', strtotime($matches[1] . ' 1'));
+                $year = intval($matches[2]);
+                if ($month) {
+                    $query->where('month', $month)
+                        ->where('year', $year);
+                    return;
+                }
+            }
+
+            // Year only
+            if (preg_match('/^\d{4}$/', $search)) {
+                $query->where('year', $search);
+                return;
+            }
+
+            // Month only (numeric or name, short or full)
+            if (preg_match('/^\d{1,2}$/', $search)) {
+                $query->where('month', intval($search));
+                return;
+            }
+            if (preg_match('/^[a-z]{3,9}$/i', $search)) {
+                $month = date('n', strtotime($search . ' 1'));
+                if ($month) {
+                    $query->where('month', $month);
+                    return;
+                }
+            }
+
+            // General search
+            $query->where('name', 'like', '%'.$search.'%')
+                ->orWhere('staff_id', 'like', '%'.$search.'%')
+                ->orWhere('year', 'like', '%'.$search.'%');
         })
         ->paginate(10);
 
         return view('livewire.admin.file-upload.index', [
             'fileUploads' => $fileUploads,
-        ])->extends('layouts.admin')->section('content');
+        ])->extends('layouts.admin');
 
     }
 }

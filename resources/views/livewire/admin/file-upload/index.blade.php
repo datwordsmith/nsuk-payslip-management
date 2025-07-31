@@ -6,14 +6,14 @@
     @endsection
 
     <div class="bg-white rounded-lg shadow-md">
-        @if (session('message'))
+        @if ($uploadMessage)
             <div class="alert alert-success" role="alert">
-                {{ session('message') }}
+                {{ $uploadMessage }}
             </div>
         @endif
-        @if (session('error'))
+        @if ($uploadError)
             <div class="alert alert-danger" role="alert">
-                {{ session('error') }}
+                {{ $uploadError }}
             </div>
         @endif
 
@@ -72,7 +72,7 @@
                                         <tr>
                                             <td class="">{{ $file->name }}</td>
                                             <td class="">{{ $file->staff_id }}</td>
-                                            <td class="">{{ date('M', mktime(0, 0, 0, $file->month, 1)) . ' ' . $file->year }}</td>
+                                            <td class="">{{ date('F', mktime(0, 0, 0, $file->month, 1)) . ' ' . $file->year }}</td>
                                             <td class="">{{ $file->type }}</td>
                                             <td class="">{{ number_format($file->size / 1024, 2) }} KB</td>
                                             <td class="">{{ $file->created_at->format('d M, y H:i') }}</td>

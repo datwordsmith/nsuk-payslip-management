@@ -2,15 +2,16 @@
 
 namespace App\Http\Livewire\Admin\PayslipDispatch;
 
+use Carbon\Carbon;
 use App\Models\Staff;
 use Livewire\Component;
 use App\Models\FileUpload;
 use Livewire\WithPagination;
 use App\Models\PayslipDispatch;
-use App\Notifications\PayslipNotification;
 use App\Jobs\ProcessPayslipDispatch;
-use App\Exports\PayslipDispatchesExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\PayslipDispatchesExport;
+use App\Notifications\PayslipNotification;
 
 class Index extends Component
 {
@@ -46,11 +47,6 @@ class Index extends Component
             return;
         }
 
-        /* $sent = 0;
-        $failed = 0;
-        $skipped = 0;
-        $skippedStaff = []; */
-
         $skipped = 0;
         $skippedStaff = [];
         $toProcess = [];
@@ -68,6 +64,7 @@ class Index extends Component
             $alreadyDispatched = PayslipDispatch::where('staff_id', $staff->staff_id)
                 ->where('month', $this->month)
                 ->where('year', $this->year)
+                ->where('status', 'sent')
                 ->exists();
 
             if ($alreadyDispatched) {
@@ -80,7 +77,7 @@ class Index extends Component
             $toProcess[] = $file;
         }
 
-        // Queue the payslips that need processing
+        // Process the payslips directly or queue them
         $total = count($toProcess);
         foreach ($toProcess as $file) {
             ProcessPayslipDispatch::dispatch(
@@ -97,7 +94,6 @@ class Index extends Component
         if ($skipped > 0) {
             $msg .= " {$skipped} skipped (already sent or no staff record";
             if (!empty($skippedStaff)) {
-                // Limit the list if there are too many
                 if (count($skippedStaff) > 5) {
                     $displayStaff = array_slice($skippedStaff, 0, 5);
                     $msg .= " for: " . implode(', ', $displayStaff) . " and " . (count($skippedStaff) - 5) . " others";
@@ -109,7 +105,6 @@ class Index extends Component
         }
 
         session()->flash('message', $msg);
-
         $this->reset(['month', 'year']);
     }
 
@@ -143,6 +138,12 @@ class Index extends Component
             return;
         }
 
+        // Mark the dispatch as failed temporarily so the job can proceed
+        PayslipDispatch::where('staff_id', $dispatch->staff_id)
+            ->where('month', $dispatch->month)
+            ->where('year', $dispatch->year)
+            ->update(['status' => 'resending']);
+
         ProcessPayslipDispatch::dispatch(
             $file->id,
             $dispatch->month,
@@ -151,6 +152,7 @@ class Index extends Component
         );
         session()->flash('message', 'Payslip resent queued successfully!');
     }
+
 
     public function resendFailedDispatches()
     {
@@ -170,17 +172,28 @@ class Index extends Component
         }
 
         foreach ($failedDispatches as $dispatch) {
-            // Dispatch the resend job for each failed dispatch
-            ProcessPayslipDispatch::dispatch(
-                $dispatch->file_id, // Assuming you have file_id in PayslipDispatch
-                $dispatch->month,
-                $dispatch->year,
-                auth()->id()
-            );
+            // Mark as resending first
+            $dispatch->update(['status' => 'resending']);
+
+            // Find the file for this dispatch
+            $file = FileUpload::where('staff_id', $dispatch->staff_id)
+                ->where('month', $dispatch->month)
+                ->where('year', $dispatch->year)
+                ->first();
+
+            if ($file) {
+                ProcessPayslipDispatch::dispatch(
+                    $file->id,
+                    $dispatch->month,
+                    $dispatch->year,
+                    auth()->id()
+                );
+            }
         }
 
         session()->flash('message', count($failedDispatches) . ' failed dispatches have been queued for resending.');
     }
+
 
     public function exportToExcel()
     {
@@ -194,15 +207,56 @@ class Index extends Component
     public function render()
     {
         $dispatches = PayslipDispatch::when($this->search, function($query) {
-            $query->where('staff_id', 'like', '%'.$this->search.'%')
-                ->orWhere('email', 'like', '%'.$this->search.'%')
-                ->orWhere('status', 'like', '%'.$this->search.'%');
+            $search = trim($this->search);
+            $matched = false;
+
+            // Explicit status search
+            if (in_array(strtolower($search), ['sent', 'failed', 'resending'])) {
+                $query->where('status', strtolower($search));
+                $matched = true;
+            }
+
+            // Month-Year pattern (e.g., "June 2025")
+            elseif (preg_match('/^(\w+)\s+(\d{4})$/i', $search, $matches)) {
+                $monthName = $matches[1];
+                $year = $matches[2];
+                $monthNumber = date('n', strtotime($monthName . ' 1'));
+                if ($monthNumber) {
+                    $query->where('month', $monthNumber)
+                        ->where('year', $year);
+                    $matched = true;
+                }
+            }
+
+            // Year only
+            elseif (preg_match('/^\d{4}$/', $search)) {
+                $query->where('year', $search);
+                $matched = true;
+            }
+
+            // Month only (full month name)
+            elseif (preg_match('/^(january|february|march|april|may|june|july|august|september|october|november|december)$/i', $search)) {
+                $monthNumber = date('n', strtotime($search . ' 1'));
+                if ($monthNumber) {
+                    $query->where('month', $monthNumber);
+                    $matched = true;
+                }
+            }
+
+            // If no specific pattern matched, do general search
+            if (!$matched) {
+                $query->where(function($q) use ($search) {
+                    $q->where('staff_id', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('status', 'like', '%'.$search.'%');
+                });
+            }
         })
         ->latest()
         ->paginate(10);
 
         return view('livewire.admin.payslip-dispatch.index', [
             'dispatches' => $dispatches
-        ])->extends('layouts.admin')->section('content');
+        ])->extends('layouts.admin');
     }
 }
