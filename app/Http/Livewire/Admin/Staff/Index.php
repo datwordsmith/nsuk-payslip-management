@@ -19,6 +19,7 @@ class Index extends Component
     public $email;
     public $excelFile;
     public $importedCount = null;
+    public $skippedCount = null;
     public $search = '';
 
     protected $rules = [
@@ -50,24 +51,23 @@ class Index extends Component
         ]);
 
         try {
+            $totalBefore = Staff::count();
             $import = new StaffImport;
-            Excel::import($import,  $this->excelFile);
+            Excel::import($import, $this->excelFile);
+            $totalAfter = Staff::count();
 
-            $this->importedCount = $import->importedCount;
+            $this->importedCount = $totalAfter - $totalBefore;
+            $this->skippedCount = $import->skippedCount;
 
-            session()->flash('message', "{$this->importedCount} staff records imported successfully!");
-            $this->reset('excelFile');
-        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            $failures = $e->failures();
-            $errors = [];
-
-            foreach ($failures as $failure) {
-                $errors[] = "Row {$failure->row()}: {$failure->errors()[0]}";
+            $message = "{$this->importedCount} staff records imported successfully!";
+            if ($this->skippedCount > 0) {
+                $message .= " {$this->skippedCount} records skipped due to validation errors or duplicates.";
             }
 
-            session()->flash('error', implode('<br>', $errors));
+            session()->flash('message', $message);
+            $this->reset('excelFile');
         } catch (\Exception $e) {
-            session()->flash('error', 'Error importing staff. Please check your Excel file format.');
+            session()->flash('error', 'Error importing staff: ' . $e->getMessage());
         }
     }
 
