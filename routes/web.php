@@ -53,7 +53,7 @@ Route::get('/test-notification', function () {
     $file = \App\Models\FileUpload::where('staff_id', 'TT0001')->first();
 
     if ($staff && $file) {
-        $staff->notify(new \App\Notifications\PayslipNotification($file, 7, 2025));
+        $staff->notify(new \App\Notifications\PayslipNotification($file, 8, 2025));
         return 'Notification sent!';
     }
 

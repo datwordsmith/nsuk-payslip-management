@@ -13,8 +13,8 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'mailgun'),
-    #'default' => env('MAIL_MAILER', 'smtp'),
+    #'default' => env('MAIL_MAILER', 'mailgun'),
+    'default' => env('MAIL_MAILER', 'smtp'),
 
     /*
     |--------------------------------------------------------------------------
@@ -43,6 +43,8 @@ return [
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
+            'verify_peer' => false,
+            'verify_peer_name' => false,
         ],
 
         'ses' => [
