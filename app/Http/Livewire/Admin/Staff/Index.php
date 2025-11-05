@@ -19,6 +19,8 @@ class Index extends Component
     public $email;
     public $excelFile;
     public $importedCount = null;
+    public $createdCount = null;
+    public $updatedCount = null;
     public $skippedCount = null;
     public $search = '';
 
@@ -51,17 +53,24 @@ class Index extends Component
         ]);
 
         try {
-            $totalBefore = Staff::count();
             $import = new StaffImport;
             Excel::import($import, $this->excelFile);
-            $totalAfter = Staff::count();
 
-            $this->importedCount = $totalAfter - $totalBefore;
-            $this->skippedCount = $import->skippedCount;
+            // Pull counters from the import
+            $this->importedCount = $import->importedCount; // created + updated
+            $this->createdCount  = $import->createdCount;
+            $this->updatedCount  = $import->updatedCount;
+            $this->skippedCount  = $import->skippedCount;
 
-            $message = "{$this->importedCount} staff records imported successfully!";
+            // Build a friendly message
+            $parts = [];
+            if ($this->createdCount) $parts[] = $this->createdCount.' created';
+            if ($this->updatedCount) $parts[] = $this->updatedCount.' updated';
+            if (empty($parts)) $parts[] = '0 changes';
+
+            $message = implode(', ', $parts) . '.';
             if ($this->skippedCount > 0) {
-                $message .= " {$this->skippedCount} records skipped due to validation errors or duplicates.";
+                $message .= ' '.$this->skippedCount.' rows skipped (validation/duplicates/unchanged).';
             }
 
             session()->flash('message', $message);
